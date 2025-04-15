@@ -1,13 +1,14 @@
 'use client';
 
-import { startTransition, use, useActionState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { useUser } from '@/lib/auth';
-import { updateAccount } from '@/app/(login)/actions';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+import { createClient } from '@/utils/supabase/client';
 
 type ActionState = {
   error?: string;
@@ -15,26 +16,46 @@ type ActionState = {
 };
 
 export default function GeneralPage() {
-  const { userPromise } = useUser();
-  const user = use(userPromise);
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    updateAccount,
-    { error: '', success: '' }
-  );
+  const router = useRouter();
+  const { user, loading } = useAuth();
+  const supabase = createClient();
+  const [state, setState] = useState<ActionState>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    // If you call the Server Action directly, it will automatically
-    // reset the form. We don't want that here, because we want to keep the
-    // client-side values in the inputs. So instead, we use an event handler
-    // which calls the action. You must wrap direct calls with startTransition.
-    // When you use the `action` prop it automatically handles that for you.
-    // Another option here is to persist the values to local storage. I might
-    // explore alternative options.
-    startTransition(() => {
-      formAction(new FormData(event.currentTarget));
-    });
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: formData.get('name'),
+          avatar_url: formData.get('avatar_url'),
+        }
+      });
+
+      if (error) throw error;
+      setState({ success: 'Profile updated successfully' });
+      router.refresh();
+    } catch (error) {
+      setState({ error: 'Failed to update profile' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (loading || !user) {
+    return (
+      <section className="flex-1 p-4 lg:p-8">
+        <Card>
+          <CardContent className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
 
   return (
     <section className="flex-1 p-4 lg:p-8">
@@ -49,26 +70,38 @@ export default function GeneralPage() {
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">Full Name</Label>
               <Input
                 id="name"
                 name="name"
-                placeholder="Enter your name"
-                defaultValue={user?.name || ''}
+                placeholder="Enter your full name"
+                defaultValue={user.user_metadata.full_name || ''}
                 required
               />
             </div>
+            
             <div>
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                placeholder="Enter your email"
-                defaultValue={user?.email || ''}
-                required
+                value={user.email || ''}
+                disabled
               />
             </div>
+            
+            <div>
+              <Label htmlFor="avatar_url">Avatar URL</Label>
+              <Input
+                id="avatar_url"
+                name="avatar_url"
+                type="url"
+                placeholder="https://example.com/avatar.jpg"
+                defaultValue={user.user_metadata.avatar_url || ''}
+              />
+            </div>
+            
             {state.error && (
               <p className="text-red-500 text-sm">{state.error}</p>
             )}
@@ -78,9 +111,9 @@ export default function GeneralPage() {
             <Button
               type="submit"
               className="bg-orange-500 hover:bg-orange-600 text-white"
-              disabled={isPending}
+              disabled={isSubmitting}
             >
-              {isPending ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...

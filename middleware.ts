@@ -1,48 +1,69 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { signToken, verifyToken } from '@/lib/auth/session';
+import { createServerClient } from '@supabase/ssr';
 
-const protectedRoutes = '/dashboard';
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get('session');
-  const isProtectedRoute = pathname.startsWith(protectedRoutes);
-
-  if (isProtectedRoute && !sessionCookie) {
-    return NextResponse.redirect(new URL('/sign-in', request.url));
-  }
-
-  let res = NextResponse.next();
-
-  if (sessionCookie) {
-    try {
-      const parsed = await verifyToken(sessionCookie.value);
-      const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      res.cookies.set({
-        name: 'session',
-        value: await signToken({
-          ...parsed,
-          expires: expiresInOneDay.toISOString(),
-        }),
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        expires: expiresInOneDay,
-      });
-    } catch (error) {
-      console.error('Error updating session:', error);
-      res.cookies.delete('session');
-      if (isProtectedRoute) {
-        return NextResponse.redirect(new URL('/sign-in', request.url));
-      }
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          const value = req.cookies.get(name)?.value;
+          console.log(`middleware: get('${name}') => ${value}`);
+          return value;
+        },
+        set(name: string, value: string, options: { path: string; maxAge?: number; domain?: string; secure?: boolean; sameSite?: 'strict' | 'lax' | 'none' }) {
+          console.log(`middleware: set('${name}', '${value}', ${JSON.stringify(options)}`);
+          res.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+        remove(name: string, options: { path: string; domain?: string; secure?: boolean; sameSite?: 'strict' | 'lax' | 'none' }) {
+          console.log(`middleware: remove('${name}', ${JSON.stringify(options)}`);
+          res.cookies.set({
+            name,
+            value: '',
+            ...options,
+            maxAge: 0,
+          });
+        },
+      },
     }
-  }
+  );
 
-  return res;
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    console.log("middleware: session:", session);
+
+    // Protected routes
+    if (!session && req.nextUrl.pathname.startsWith('/dashboard')) {
+      const redirectUrl = new URL('/sign-in', req.url);
+      // Preserve the original URL to redirect back after login
+      redirectUrl.searchParams.set('redirect', req.nextUrl.pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    // Auth pages when logged in
+    if (session && ['/login', '/signup', '/sign-in', '/sign-up'].includes(req.nextUrl.pathname)) {
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+
+    return res;
+  } catch (error) {
+    console.error("middleware: Error getting session:", error);
+    return res;
+  }
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
+  ],
 };

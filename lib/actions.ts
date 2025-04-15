@@ -63,6 +63,7 @@ export function withTeam<T>(action: ActionWithTeamFunction<T>) {
     const user = await getUser();
     if (!user) {
       redirect('/sign-in');
+      throw new Error('Redirect failed');
     }
 
     const team = await getTeamForUser(user.id);
@@ -72,4 +73,4 @@ export function withTeam<T>(action: ActionWithTeamFunction<T>) {
 
     return action(formData, team);
   };
-}
+} 

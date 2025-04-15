@@ -15,9 +15,10 @@ import {
 import { 
   Dialog, 
   DialogContent, 
-  DialogTrigger 
+  DialogTrigger,
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   User, 
   Settings, 
@@ -28,11 +29,13 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
+interface DashboardParentLayoutProps {
+  children: React.ReactNode;
+}
+
 export default function DashboardParentLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
+}: DashboardParentLayoutProps) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -55,21 +58,15 @@ export default function DashboardParentLayout({
             {/* Desktop navigation - right side */}
             <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
               {/* Theme toggle */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  >
-                    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                    <span className="sr-only">Toggle theme</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Switch to {theme === 'dark' ? 'light' : 'dark'} mode
-                </TooltipContent>
-              </Tooltip>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              >
+                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                <span className="sr-only">Toggle theme</span>
+              </Button>
 
               {/* User dropdown */}
               <DropdownMenu>
@@ -79,7 +76,7 @@ export default function DashboardParentLayout({
                     <span className="sr-only">User menu</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
@@ -91,7 +88,7 @@ export default function DashboardParentLayout({
                     <span>Settings</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Logout</span>
                   </DropdownMenuItem>
@@ -101,42 +98,54 @@ export default function DashboardParentLayout({
 
             {/* Mobile menu button */}
             <div className="flex items-center sm:hidden">
-              <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost">
-                    <Menu className="h-6 w-6" />
-                    <span className="sr-only">Open menu</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <div className="flex flex-col space-y-4 py-4">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                      className="justify-start"
-                    >
-                      {theme === 'dark' ? <Sun className="mr-2 h-5 w-5" /> : <Moon className="mr-2 h-5 w-5" />}
-                      Switch to {theme === 'dark' ? 'light' : 'dark'} mode
-                    </Button>
-                    <Button variant="ghost" className="justify-start">
-                      <User className="mr-2 h-5 w-5" />
-                      Profile
-                    </Button>
-                    <Button variant="ghost" className="justify-start">
-                      <Settings className="mr-2 h-5 w-5" />
-                      Settings
-                    </Button>
-                    <Button variant="ghost" className="justify-start">
-                      <LogOut className="mr-2 h-5 w-5" />
-                      Logout
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button 
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">Open menu</span>
+              </Button>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Mobile menu */}
+      <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+        <DialogContent className="sm:hidden fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white dark:bg-gray-950 px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
+          <DialogHeader>
+            <DialogTitle>Menu</DialogTitle>
+          </DialogHeader>
+          <div className="mt-6 flow-root">
+            <div className="space-y-2">
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  setTheme(theme === 'dark' ? 'light' : 'dark');
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full justify-start"
+              >
+                {theme === 'dark' ? <Sun className="mr-2 h-5 w-5" /> : <Moon className="mr-2 h-5 w-5" />}
+                Switch to {theme === 'dark' ? 'light' : 'dark'} mode
+              </Button>
+              <Button variant="ghost" className="w-full justify-start">
+                <User className="mr-2 h-5 w-5" />
+                Profile
+              </Button>
+              <Button variant="ghost" className="w-full justify-start">
+                <Settings className="mr-2 h-5 w-5" />
+                Settings
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-destructive">
+                <LogOut className="mr-2 h-5 w-5" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Main content */}
       <main className="flex-1 bg-gray-50 dark:bg-gray-900">
